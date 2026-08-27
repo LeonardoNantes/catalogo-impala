@@ -29,7 +29,8 @@ async function buscarProdutos() {
       .from(tabela)
       .select("*")
       .eq("ativo", true)
-      .order("colecao", { ascending: true });
+      .order("colecao", { ascending: true })
+      .order("descricao", { ascending: true });
 
     if (error) throw error;
     if (!data || data.length === 0) {
