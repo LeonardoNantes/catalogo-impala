@@ -11,10 +11,30 @@
 </head>
 <body>
 
+  <!-- Indicador exibido só nos primeiros instantes, antes de sabermos
+       se o catálogo está ativo ou pausado -->
+  <div id="carregando-app" class="carregando-app">
+    <span class="spinner"></span>
+  </div>
+
+  <!-- ===================================================== -->
+  <!-- TELA DE CATÁLOGO PAUSADO (assinatura em atraso) -->
+  <!-- ===================================================== -->
+  <section id="tela-pausado" class="tela tela-pausado" hidden>
+    <div class="pausado-conteudo">
+      <span class="pausado-icone">⏸️</span>
+      <h1>Catálogo temporariamente pausado</h1>
+      <p>Este catálogo está com o acesso pausado no momento. Entre em contato pra regularizar e voltar a usar normalmente.</p>
+      <a id="btn-pausado-whatsapp" class="btn-pausado-whatsapp" href="#" target="_blank" rel="noopener">
+        Falar no WhatsApp
+      </a>
+    </div>
+  </section>
+
   <!-- ===================================================== -->
   <!-- TELA 1 — INICIAL: cabeçalho + cards de coleção -->
   <!-- ===================================================== -->
-  <section id="tela-inicial" class="tela">
+  <section id="tela-inicial" class="tela" hidden>
     <header class="app-header">
       <img id="vendedor-foto" class="vendedor-foto" src="" alt="Foto do vendedor" />
       <div class="header-texto">

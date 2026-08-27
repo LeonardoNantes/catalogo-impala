@@ -25,7 +25,7 @@ function mostrarTela(idTela, direcao = "frente") {
   });
   // O botão flutuante do carrinho só aparece nas telas 1 e 2
   const btnCarrinho = document.getElementById("btn-carrinho");
-  btnCarrinho.hidden = idTela === "tela-carrinho";
+  btnCarrinho.hidden = idTela === "tela-carrinho" || idTela === "tela-pausado";
   window.scrollTo(0, 0);
 }
 
@@ -277,9 +277,28 @@ function enviarPedidoWhatsapp() {
   window.open(url, "_blank");
 }
 
+// ---------- Tela de pausado (assinatura em atraso) ----------
+function configurarBotaoPausado() {
+  const btn = document.getElementById("btn-pausado-whatsapp");
+  const texto = encodeURIComponent(
+    `Olá! Meu catálogo (${CONFIG.nomeCatalogo}) está pausado, gostaria de regularizar o acesso.`
+  );
+  btn.href = `https://wa.me/${PLATAFORMA.whatsapp}?text=${texto}`;
+}
+
 // ---------- Boot ----------
 async function iniciar() {
   iniciarCabecalho();
+
+  const carregando = document.getElementById("carregando-app");
+
+  const vendedorAtivo = await verificarVendedorAtivo();
+  if (!vendedorAtivo) {
+    carregando.hidden = true;
+    configurarBotaoPausado();
+    mostrarTela("tela-pausado");
+    return;
+  }
 
   const statusMsg = document.getElementById("status-msg");
   statusMsg.hidden = false;
@@ -297,6 +316,7 @@ async function iniciar() {
   document.getElementById("btn-enviar-pedido").addEventListener("click", enviarPedidoWhatsapp);
   document.getElementById("btn-limpar-carrinho").addEventListener("click", limparCarrinho);
 
+  carregando.hidden = true;
   mostrarTela("tela-inicial");
 }
 

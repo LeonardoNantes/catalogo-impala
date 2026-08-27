@@ -14,6 +14,32 @@ function montarUrlImagem(codigo) {
   return `${url}/storage/v1/object/public/${bucketImagens}/${codigo}.jpg`;
 }
 
+// Confere na tabela "vendedores" se este catálogo está ativo (assinatura em dia).
+// Por segurança, qualquer situação incerta (sem config, erro de rede, linha não
+// encontrada) deixa o catálogo ATIVO — só pausa quando a gente tem certeza que
+// o vendedor foi marcado como inativo de propósito.
+async function verificarVendedorAtivo() {
+  const { url, anonKey } = CONFIG.supabase;
+  const vendedorId = CONFIG.vendedorId;
+
+  if (!url || !anonKey || !vendedorId) return true;
+
+  try {
+    const client = window.supabase.createClient(url, anonKey);
+    const { data, error } = await client
+      .from("vendedores")
+      .select("ativo")
+      .eq("slug", vendedorId)
+      .maybeSingle();
+
+    if (error || !data) return true;
+    return data.ativo !== false;
+  } catch (erro) {
+    console.error("[Impala] Erro ao checar status do vendedor:", erro);
+    return true;
+  }
+}
+
 async function buscarProdutos() {
   const { url, anonKey, tabela } = CONFIG.supabase;
 

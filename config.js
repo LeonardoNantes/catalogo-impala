@@ -7,6 +7,11 @@
 // (a exceção é o arquivo plataforma.js, que NÃO muda entre vendedores)
 
 const CONFIG = {
+  // ---- Identificador único deste catálogo (marca + vendedor) ----
+  // Usado pra checar na tabela "vendedores" se este catálogo está ativo
+  // (assinatura em dia) ou pausado. Cada vendedor de cada marca tem o seu.
+  vendedorId: "impala-leonardo",
+
   // ---- Marca / catálogo ----
   marca: "Impala",
   nomeCatalogo: "Loja Impala",

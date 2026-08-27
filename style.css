@@ -31,6 +31,74 @@ body {
   padding-bottom: 32px;
 }
 
+.carregando-app {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cor-fundo);
+}
+
+.carregando-app .spinner {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+
+.carregando-app[hidden] {
+  display: none;
+}
+
+/* ============================================================
+   TELA DE CATÁLOGO PAUSADO
+   ============================================================ */
+
+.tela-pausado {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tela-pausado[hidden] {
+  display: none;
+}
+
+.pausado-conteudo {
+  max-width: 380px;
+  text-align: center;
+}
+
+.pausado-icone {
+  font-size: 2.6rem;
+  display: block;
+  margin-bottom: 14px;
+}
+
+.tela-pausado h1 {
+  font-size: 1.2rem;
+  margin: 0 0 10px;
+  color: var(--cor-primaria);
+}
+
+.tela-pausado p {
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.btn-pausado-whatsapp {
+  display: inline-block;
+  background: #25d366;
+  color: var(--cor-branco);
+  text-decoration: none;
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 0.9rem;
+}
+
 @keyframes entrarFrente {
   from { opacity: 0; transform: translateX(16px); }
   to { opacity: 1; transform: translateX(0); }
