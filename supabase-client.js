@@ -14,33 +14,40 @@ function montarUrlImagem(codigo) {
   return `${url}/storage/v1/object/public/${bucketImagens}/${codigo}.jpg`;
 }
 
-// Confere na tabela "vendedores" se este catálogo está ativo (assinatura em dia).
-// Por segurança, qualquer situação incerta (sem config, erro de rede, linha não
-// encontrada) deixa o catálogo ATIVO — só pausa quando a gente tem certeza que
-// o vendedor foi marcado como inativo de propósito.
-async function verificarVendedorAtivo() {
+// Confere na tabela "vendedores" se este catálogo está ativo (assinatura em
+// dia) e qual é a ÁREA de preço desse vendedor (SC, PR, etc.) — cada
+// vendedor só vê os preços da própria área. Por segurança, qualquer
+// situação incerta (sem config, erro de rede, linha não encontrada) deixa
+// o catálogo ATIVO e na área "SC" — só pausa quando a gente tem certeza
+// que o vendedor foi marcado como inativo de propósito.
+async function buscarStatusVendedor() {
   const { url, anonKey } = CONFIG.supabase;
   const vendedorId = CONFIG.vendedorId;
+  const padrao = { ativo: true, area: "SC" };
 
-  if (!url || !anonKey || !vendedorId) return true;
+  if (!url || !anonKey || !vendedorId) return padrao;
 
   try {
     const client = window.supabase.createClient(url, anonKey);
     const { data, error } = await client
       .from("vendedores")
-      .select("ativo")
+      .select("ativo, area")
       .eq("slug", vendedorId)
       .maybeSingle();
 
-    if (error || !data) return true;
-    return data.ativo !== false;
+    if (error || !data) return padrao;
+    return {
+      ativo: data.ativo !== false,
+      area: data.area || "SC",
+    };
   } catch (erro) {
     console.error("[Impala] Erro ao checar status do vendedor:", erro);
-    return true;
+    return padrao;
   }
 }
 
-async function buscarProdutos() {
+// "area" é a área de preço do vendedor logado (vem de buscarStatusVendedor).
+async function buscarProdutos(area) {
   const { url, anonKey, tabela } = CONFIG.supabase;
 
   const semSupabaseConfigurado = !url || !anonKey;
@@ -55,6 +62,7 @@ async function buscarProdutos() {
       .from(tabela)
       .select("*")
       .eq("ativo", true)
+      .eq("area", area || "SC")
       .order("colecao", { ascending: true })
       .order("descricao", { ascending: true });
 
