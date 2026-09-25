@@ -1,11 +1,13 @@
 // ============================================================
-// LÓGICA DO CATÁLOGO — 3 telas, coleções, carrinho e WhatsApp
+// LÓGICA DO CATÁLOGO — versão do site COMPARTILHADO (3 telas, coleções,
+// carrinho e WhatsApp) — reconhece o vendedor por ?v= ou domínio antigo
 // ============================================================
 
 const carrinho = new Map(); // codigo -> { produto, quantidade }
 let TODOS_PRODUTOS = [];
 let PRODUTOS_POR_COLECAO = new Map(); // colecao -> [produtos]
 let COLECAO_ATUAL = null; // colecao sendo exibida na tela 2
+let VENDEDOR_ATUAL = null; // { nome, whatsapp, foto_url, area, ... } do vendedor resolvido nesse acesso
 
 // ---------- Formatação ----------
 function formatarPreco(valor) {
@@ -25,16 +27,16 @@ function mostrarTela(idTela, direcao = "frente") {
   });
   // O botão flutuante do carrinho só aparece nas telas 1 e 2
   const btnCarrinho = document.getElementById("btn-carrinho");
-  btnCarrinho.hidden = idTela === "tela-carrinho" || idTela === "tela-pausado";
+  const telasSemCarrinho = ["tela-carrinho", "tela-pausado", "tela-nao-encontrado"];
+  btnCarrinho.hidden = telasSemCarrinho.includes(idTela);
   window.scrollTo(0, 0);
 }
 
-// ---------- Cabeçalho e blocos fixos da tela inicial ----------
-function iniciarCabecalho() {
+// ---------- Cabeçalho: parte que é igual pra todo mundo (marca) ----------
+function iniciarCabecalhoMarca() {
   document.getElementById("nome-catalogo").textContent = CONFIG.nomeCatalogo;
-  document.getElementById("vendedor-nome").textContent = CONFIG.vendedor.nome;
-  document.getElementById("vendedor-slogan").textContent = CONFIG.vendedor.slogan;
-  document.getElementById("vendedor-foto").src = CONFIG.vendedor.foto;
+  document.getElementById("vendedor-slogan").textContent = CONFIG.vendedorPadrao.slogan;
+  document.getElementById("vendedor-foto").src = CONFIG.vendedorPadrao.foto;
   document.getElementById("slogan-marca").textContent = CONFIG.sloganMarca;
   document.documentElement.style.setProperty("--cor-primaria", CONFIG.corPrimaria);
   document.documentElement.style.setProperty("--cor-destaque", CONFIG.corDestaque);
@@ -44,6 +46,14 @@ function iniciarCabecalho() {
   const btnSolicitar = document.getElementById("btn-solicitar-catalogo");
   const texto = encodeURIComponent(PLATAFORMA.mensagemPadrao);
   btnSolicitar.href = `https://wa.me/${PLATAFORMA.whatsapp}?text=${texto}`;
+}
+
+// ---------- Cabeçalho: parte que depende do vendedor identificado ----------
+function preencherCabecalhoVendedor(vendedor) {
+  document.getElementById("vendedor-nome").textContent = vendedor.nome || "Vendedor";
+  if (vendedor.foto_url) {
+    document.getElementById("vendedor-foto").src = vendedor.foto_url;
+  }
 }
 
 // ---------- Tela 1: cards de coleção ----------
@@ -272,8 +282,13 @@ function enviarPedidoWhatsapp() {
     alert("Adicione pelo menos um produto antes de enviar o pedido.");
     return;
   }
+  const whatsappVendedor = VENDEDOR_ATUAL?.whatsapp;
+  if (!whatsappVendedor) {
+    alert("Não conseguimos identificar o WhatsApp deste vendedor. Recarregue a página e tente novamente.");
+    return;
+  }
   const texto = encodeURIComponent(montarTextoPedido());
-  const url = `https://wa.me/${CONFIG.vendedor.whatsapp}?text=${texto}`;
+  const url = `https://wa.me/${whatsappVendedor}?text=${texto}`;
   window.open(url, "_blank");
 }
 
@@ -286,16 +301,42 @@ function configurarBotaoPausado() {
   btn.href = `https://wa.me/${PLATAFORMA.whatsapp}?text=${texto}`;
 }
 
+// ---------- Tela de "catálogo não encontrado" (link inválido/desconhecido) ----------
+function configurarBotaoNaoEncontrado() {
+  const btn = document.getElementById("btn-nao-encontrado-whatsapp");
+  const texto = encodeURIComponent(
+    `Olá! Abri um link de catálogo Impala (${window.location.href}) e apareceu "não encontrado". Pode me ajudar?`
+  );
+  btn.href = `https://wa.me/${PLATAFORMA.whatsapp}?text=${texto}`;
+}
+
 // ---------- Boot ----------
 async function iniciar() {
-  iniciarCabecalho();
+  iniciarCabecalhoMarca();
 
   const carregando = document.getElementById("carregando-app");
 
-  const statusVendedor = await buscarStatusVendedor();
-  if (statusVendedor.foto_url) {
-    document.getElementById("vendedor-foto").src = statusVendedor.foto_url;
+  // 1) Descobre QUEM é o vendedor (via ?v= ou domínio antigo)
+  const vendedorId = await resolverVendedorId();
+  if (!vendedorId) {
+    carregando.hidden = true;
+    configurarBotaoNaoEncontrado();
+    mostrarTela("tela-nao-encontrado");
+    return;
   }
+
+  // 2) Busca os dados desse vendedor no Supabase
+  const statusVendedor = await buscarStatusVendedor(vendedorId);
+  if (!statusVendedor.encontrado) {
+    carregando.hidden = true;
+    configurarBotaoNaoEncontrado();
+    mostrarTela("tela-nao-encontrado");
+    return;
+  }
+
+  VENDEDOR_ATUAL = statusVendedor;
+  preencherCabecalhoVendedor(statusVendedor);
+
   if (!statusVendedor.ativo) {
     carregando.hidden = true;
     configurarBotaoPausado();

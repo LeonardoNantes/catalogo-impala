@@ -12,7 +12,7 @@
 <body>
 
   <!-- Indicador exibido só nos primeiros instantes, antes de sabermos
-       se o catálogo está ativo ou pausado -->
+       quem é o vendedor e se o catálogo dele está ativo ou pausado -->
   <div id="carregando-app" class="carregando-app">
     <span class="spinner"></span>
   </div>
@@ -26,6 +26,20 @@
       <h1>Catálogo temporariamente pausado</h1>
       <p>Este catálogo está com o acesso pausado no momento. Entre em contato pra regularizar e voltar a usar normalmente.</p>
       <a id="btn-pausado-whatsapp" class="btn-pausado-whatsapp" href="#" target="_blank" rel="noopener">
+        Falar no WhatsApp
+      </a>
+    </div>
+  </section>
+
+  <!-- ===================================================== -->
+  <!-- TELA DE CATÁLOGO NÃO ENCONTRADO (link/domínio desconhecido) -->
+  <!-- ===================================================== -->
+  <section id="tela-nao-encontrado" class="tela tela-pausado" hidden>
+    <div class="pausado-conteudo">
+      <span class="pausado-icone">🔍</span>
+      <h1>Catálogo não encontrado</h1>
+      <p>Não encontramos um catálogo pra este link. Verifique o endereço com quem te passou ou entre em contato.</p>
+      <a id="btn-nao-encontrado-whatsapp" class="btn-pausado-whatsapp" href="#" target="_blank" rel="noopener">
         Falar no WhatsApp
       </a>
     </div>
@@ -127,7 +141,7 @@
     <span id="carrinho-contagem">0</span>
   </button>
 
-  <!-- Supabase JS via CDN (usado apenas se as credenciais forem configuradas em config.js) -->
+  <!-- Supabase JS via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
   <script src="plataforma.js"></script>

@@ -1,29 +1,23 @@
 // ============================================================
-// CONFIGURAÇÃO DO CATÁLOGO — edite este arquivo para personalizar
+// CONFIGURAÇÃO DO CATÁLOGO — site COMPARTILHADO do Impala
 // ============================================================
-// Este é o ÚNICO arquivo que muda de um vendedor para outro.
-// Para criar o catálogo de outro vendedor, copie a pasta inteira
-// e troque só os valores aqui embaixo.
-// (a exceção é o arquivo plataforma.js, que NÃO muda entre vendedores)
+// Esta versão é diferente da versão "1 vendedor = 1 pasta" de antes:
+// aqui NÃO existe mais vendedorId nem nome/whatsapp fixos. Cada acesso
+// descobre sozinho quem é o vendedor (por ?v=slug na URL, ou pelo
+// domínio antigo) e busca nome/foto/whatsapp dele no Supabase, na hora.
+// Ver resolver-vendedor.js e supabase-client.js.
 
 const CONFIG = {
-  // ---- Identificador único deste catálogo (marca + vendedor) ----
-  // Usado pra checar na tabela "vendedores" se este catálogo está ativo
-  // (assinatura em dia) ou pausado. Cada vendedor de cada marca tem o seu.
-  vendedorId: "impala-leonardo",
-
-  // ---- Marca / catálogo ----
+  // ---- Marca / catálogo (igual pra todo mundo) ----
   marca: "Impala",
   nomeCatalogo: "Loja Impala",
   sloganMarca: "💅 Impala, a cor da sua moda! 💅",
 
-  // ---- Dados do vendedor (aparecem no cabeçalho e no link do WhatsApp) ----
-  vendedor: {
-    nome: "Leonardo Nantes",
+  // ---- Vendedor: valores usados só nos primeiros instantes, antes de
+  // carregar os dados reais do vendedor identificado pelo link ----
+  vendedorPadrao: {
     slogan: "O seu Vendedor!",
     foto: "assets/vendedor-foto.jpg",
-    // Número de WhatsApp no formato internacional, só números (DDI 55 + DDD + número)
-    whatsapp: "5547997375295",
   },
 
   // ---- Cores da marca (usadas no cabeçalho e nos botões) ----
@@ -36,9 +30,6 @@ const CONFIG = {
   paletaCards: ["#c2185b", "#e91e63", "#ad1457", "#f06292", "#9c27b0"],
 
   // ---- Supabase ----
-  // Deixe em branco ("") enquanto o Supabase não estiver configurado.
-  // O app funciona com produtos de exemplo (mock) até essas credenciais
-  // serem preenchidas — assim dá pra testar o catálogo sem depender do banco.
   supabase: {
     url: "https://eubbzefshftafjjcirna.supabase.co",
     anonKey: "sb_publishable_GZ-duizLJSQSVcdYejzWGQ_wdNUu8vA",
