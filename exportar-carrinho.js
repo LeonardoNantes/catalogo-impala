@@ -45,6 +45,10 @@ const EXPORT_GRADE_ALTURA_BADGE = 52;
 // (16 itens por imagem em vez de 12), sem precisar mexer no tamanho dos
 // cartões nem no espaço entre eles.
 const EXPORT_GRADE_FATOR_ALTURA_FOTO = 0.93;
+// Mesma ideia, só que pro PDF (que usa milímetros em vez de pixels, e
+// fontes um pouco maiores proporcionalmente) — precisa encolher um pouco
+// mais a foto pra caber as mesmas 4 fileiras (16 itens) por página.
+const EXPORT_PDF_FATOR_ALTURA_FOTO = 0.84;
 // Cor da etiqueta de preço nos cartões — tom roxo/vinho do próprio logo
 // do Impala (puxado direto da palavra "Impala" na imagem-modelo), com o
 // mesmo brilho dourado suave que já era usado na foto do vendedor no app.
@@ -526,117 +530,114 @@ async function exportarGerarPdfCarrinho() {
     const larguraCard = (larguraUtil - gutterH * (colunas - 1)) / colunas;
     const padCard = 2.2;
     const larguraFoto = larguraCard - padCard * 2;
-    const alturaFoto = larguraFoto;
+    // Foto um pouco mais baixa que larga (em vez de quadrada) — mesma
+    // regra da Imagem, é o que abre espaço pra 4ª fileira (16 itens por
+    // página em vez de 12). Ver EXPORT_PDF_FATOR_ALTURA_FOTO.
+    const alturaFoto = larguraFoto * EXPORT_PDF_FATOR_ALTURA_FOTO;
     const alturaBadge = 9.6;
     const alturaTextos = 12.5;
     const alturaCard = padCard + alturaFoto + alturaTextos + alturaBadge + padCard;
 
-    const ladoFotoPx = Math.round(larguraFoto * (300 / 25.4));
+    // Recorte já no formato final da foto (largura x altura, não mais um
+    // quadrado) — se não fizer isso aqui, a imagem quadrada recortada
+    // abaixo ficaria esticada ao ser encaixada numa caixa não-quadrada.
+    const larguraFotoPx = Math.round(larguraFoto * (300 / 25.4));
+    const alturaFotoPx = Math.round(alturaFoto * (300 / 25.4));
     const fotosRecortadas = new Map();
     imagensProdutos.forEach((img, codigo) => {
       const canvasFoto = document.createElement("canvas");
-      canvasFoto.width = ladoFotoPx;
-      canvasFoto.height = ladoFotoPx;
-      exportarDesenharImagemPreenchendo(canvasFoto.getContext("2d"), img, 0, 0, ladoFotoPx, ladoFotoPx);
+      canvasFoto.width = larguraFotoPx;
+      canvasFoto.height = alturaFotoPx;
+      exportarDesenharImagemPreenchendo(canvasFoto.getContext("2d"), img, 0, 0, larguraFotoPx, alturaFotoPx);
       fotosRecortadas.set(codigo, canvasFoto.toDataURL("image/jpeg", 0.9));
     });
 
-    grupos.forEach((grupo) => {
-      if (y + 6 + alturaCard > areaBase) { doc.addPage(); desenharFundo(); desenharCabecalhoVendedor(); y = areaTopo + 6; }
+    // Grade contínua, sem separar por coleção — igual já é feito na
+    // Imagem (o pedido dentro de cada coleção continua agrupado, só não
+    // aparece mais o nome da coleção como título entre os grupos).
+    let coluna = 0;
+    todosItens.forEach((item) => {
+      if (coluna === 0 && y + alturaCard > areaBase) {
+        doc.addPage();
+        desenharFundo();
+        desenharCabecalhoVendedor();
+        y = areaTopo;
+      }
+
+      const x = margemX + coluna * (larguraCard + gutterH);
+
+      doc.setDrawColor(225, 224, 218);
+      doc.setFillColor(255, 255, 255);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(x, y, larguraCard, alturaCard, 1.8, 1.8, "FD");
+
+      const fotoDataUrl = fotosRecortadas.get(item.codigo);
+      if (fotoDataUrl) {
+        try {
+          doc.addImage(fotoDataUrl, "JPEG", x + padCard, y + padCard, larguraFoto, alturaFoto);
+        } catch (erro) {
+          console.error("[Carrinho Impala] Erro ao inserir imagem no PDF:", erro);
+        }
+      } else {
+        doc.setFillColor(244, 243, 238);
+        doc.rect(x + padCard, y + padCard, larguraFoto, alturaFoto, "F");
+      }
+
+      const precoTexto = exportarFormatarPrecoSemPrefixo(item.preco_unitario);
+      const larguraBadge = larguraFoto;
+      const xBadge = x + padCard;
+      const yBadge = y + alturaCard - padCard - alturaBadge;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.2);
+      const linhaCodigo = doc.splitTextToSize(`Cód. ${item.codigo}`, larguraFoto)[0];
 
       doc.setFont("helvetica", "bolditalic");
-      doc.setFontSize(11);
-      doc.setTextColor(173, 20, 87);
-      doc.text(grupo.colecao.toUpperCase(), margemX, y);
-      y += 5.5;
+      doc.setFontSize(8.3);
+      const todasLinhasNome = doc.splitTextToSize(item.descricao, larguraFoto);
+      const linhasNome = todasLinhasNome.slice(0, 2);
+      if (todasLinhasNome.length > 2 && linhasNome[1].length > 1) {
+        linhasNome[1] = linhasNome[1].slice(0, -1) + "…";
+      }
 
-      let coluna = 0;
-      grupo.itens.forEach((item) => {
-        if (coluna === 0 && y + alturaCard > areaBase) {
-          doc.addPage();
-          desenharFundo();
-          desenharCabecalhoVendedor();
-          y = areaTopo + 6;
-        }
+      const gapCodigoBadge = 2.6;
+      const gapNomeCodigo = 3.4;
+      const linhaAlturaNome = 3.4;
 
-        const x = margemX + coluna * (larguraCard + gutterH);
+      const yCodigo = yBadge - gapCodigoBadge;
+      const yUltimaLinhaNome = yCodigo - gapNomeCodigo;
+      const yPrimeiraLinhaNome = yUltimaLinhaNome - (linhasNome.length - 1) * linhaAlturaNome;
 
-        doc.setDrawColor(225, 224, 218);
-        doc.setFillColor(255, 255, 255);
-        doc.setLineWidth(0.2);
-        doc.roundedRect(x, y, larguraCard, alturaCard, 1.8, 1.8, "FD");
+      doc.setTextColor(30, 30, 30);
+      doc.setFont("helvetica", "bolditalic");
+      doc.setFontSize(8.3);
+      linhasNome.forEach((linha, li) => doc.text(linha, x + padCard, yPrimeiraLinhaNome + li * linhaAlturaNome));
 
-        const fotoDataUrl = fotosRecortadas.get(item.codigo);
-        if (fotoDataUrl) {
-          try {
-            doc.addImage(fotoDataUrl, "JPEG", x + padCard, y + padCard, larguraFoto, alturaFoto);
-          } catch (erro) {
-            console.error("[Carrinho Impala] Erro ao inserir imagem no PDF:", erro);
-          }
-        } else {
-          doc.setFillColor(244, 243, 238);
-          doc.rect(x + padCard, y + padCard, larguraFoto, alturaFoto, "F");
-        }
+      doc.setTextColor(130, 130, 130);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.2);
+      doc.text(linhaCodigo, x + padCard, yCodigo);
 
-        const precoTexto = exportarFormatarPrecoSemPrefixo(item.preco_unitario);
-        const larguraBadge = larguraFoto;
-        const xBadge = x + padCard;
-        const yBadge = y + alturaCard - padCard - alturaBadge;
+      doc.setFillColor(92, 31, 84);
+      doc.roundedRect(xBadge, yBadge, larguraBadge, alturaBadge, 1.6, 1.6, "F");
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(6.2);
-        const linhaCodigo = doc.splitTextToSize(`Cód. ${item.codigo}`, larguraFoto)[0];
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.6);
+      doc.setTextColor(255, 255, 255);
+      doc.text("R$", xBadge + 2, yBadge + 3.4);
+      doc.setTextColor(233, 217, 229);
+      doc.text("unid", xBadge + larguraBadge - 2, yBadge + 3.4, { align: "right" });
 
-        doc.setFont("helvetica", "bolditalic");
-        doc.setFontSize(8.3);
-        const todasLinhasNome = doc.splitTextToSize(item.descricao, larguraFoto);
-        const linhasNome = todasLinhasNome.slice(0, 2);
-        if (todasLinhasNome.length > 2 && linhasNome[1].length > 1) {
-          linhasNome[1] = linhasNome[1].slice(0, -1) + "…";
-        }
+      doc.setFont("helvetica", "bolditalic");
+      doc.setFontSize(13.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 2, { align: "center" });
 
-        const gapCodigoBadge = 2.6;
-        const gapNomeCodigo = 3.4;
-        const linhaAlturaNome = 3.4;
-
-        const yCodigo = yBadge - gapCodigoBadge;
-        const yUltimaLinhaNome = yCodigo - gapNomeCodigo;
-        const yPrimeiraLinhaNome = yUltimaLinhaNome - (linhasNome.length - 1) * linhaAlturaNome;
-
-        doc.setTextColor(30, 30, 30);
-        doc.setFont("helvetica", "bolditalic");
-        doc.setFontSize(8.3);
-        linhasNome.forEach((linha, li) => doc.text(linha, x + padCard, yPrimeiraLinhaNome + li * linhaAlturaNome));
-
-        doc.setTextColor(130, 130, 130);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(6.2);
-        doc.text(linhaCodigo, x + padCard, yCodigo);
-
-        doc.setFillColor(92, 31, 84);
-        doc.roundedRect(xBadge, yBadge, larguraBadge, alturaBadge, 1.6, 1.6, "F");
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.6);
-        doc.setTextColor(255, 255, 255);
-        doc.text("R$", xBadge + 2, yBadge + 3.4);
-        doc.setTextColor(233, 217, 229);
-        doc.text("unid", xBadge + larguraBadge - 2, yBadge + 3.4, { align: "right" });
-
-        doc.setFont("helvetica", "bolditalic");
-        doc.setFontSize(13.5);
-        doc.setTextColor(255, 255, 255);
-        doc.text(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 2, { align: "center" });
-
-        coluna++;
-        if (coluna === colunas) {
-          coluna = 0;
-          y += alturaCard + gutterV;
-        }
-      });
-
-      if (coluna !== 0) y += alturaCard + gutterV;
-      y += 3;
+      coluna++;
+      if (coluna === colunas) {
+        coluna = 0;
+        y += alturaCard + gutterV;
+      }
     });
 
     const dataArquivo = new Date().toISOString().slice(0, 10);
