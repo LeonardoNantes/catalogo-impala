@@ -16,6 +16,12 @@
 const EXPORT_TEMPLATE_CAMINHO = "template-impala.jpg";
 const EXPORT_TEMPLATE_LARGURA = 1414;
 const EXPORT_TEMPLATE_ALTURA = 2000;
+// A Imagem é desenhada numa resolução mais alta que o tamanho final do
+// molde (e depois reduzida de volta na hora de desenhar), só pra deixar o
+// texto mais nítido — o PDF é vetorial (sempre nítido, em qualquer zoom),
+// a Imagem é um raster então precisa de mais pixels reais pra ficar à
+// altura.
+const EXPORT_PNG_ESCALA = 2;
 // Área em branco da imagem-modelo onde a grade de cartões pode ser
 // desenhada sem cobrir a moldura (medida direto no arquivo do Leonardo).
 // Atualizado pro molde novo, com o cabeçalho mais enxuto (logo termina
@@ -225,7 +231,7 @@ function exportarDesenharGradeDeCartoes(ctx, itens, imagensProdutos, opcoes) {
     const xBadge = x + padCard;
     const yBadge = y + alturaCard - padCard - alturaBadge;
 
-    ctx.font = "400 9.5px 'Inter', sans-serif";
+    ctx.font = "600 11px 'Inter', sans-serif";
     const linhaCodigo = exportarQuebrarTextoCanvas(ctx, `Cód. ${item.codigo}`, larguraFoto, 1)[0];
 
     ctx.font = "italic 700 15px 'Playfair Display', serif";
@@ -243,8 +249,8 @@ function exportarDesenharGradeDeCartoes(ctx, itens, imagensProdutos, opcoes) {
     ctx.font = "italic 700 15px 'Playfair Display', serif";
     linhasNome.forEach((linha, li) => ctx.fillText(linha, x + padCard, yPrimeiraLinhaNome + li * linhaAlturaNome));
 
-    ctx.fillStyle = "#8A8A8A";
-    ctx.font = "400 9.5px 'Inter', sans-serif";
+    ctx.fillStyle = "#1E1E1E";
+    ctx.font = "600 11px 'Inter', sans-serif";
     ctx.fillText(linhaCodigo, x + padCard, yCodigo);
 
     ctx.save();
@@ -266,9 +272,9 @@ function exportarDesenharGradeDeCartoes(ctx, itens, imagensProdutos, opcoes) {
     ctx.fillText("unid", xBadge + larguraBadge - 11, yBadge + 16);
 
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = "italic 700 34px 'Playfair Display', serif";
+    ctx.font = "italic 700 38px 'Playfair Display', serif";
     ctx.textAlign = "center";
-    ctx.fillText(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 10);
+    ctx.fillText(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 14);
     ctx.textAlign = "left";
   });
 }
@@ -398,9 +404,10 @@ async function exportarGerarImagemCarrinho() {
     }
 
     const canvas = document.createElement("canvas");
-    canvas.width = EXPORT_TEMPLATE_LARGURA;
-    canvas.height = EXPORT_TEMPLATE_ALTURA;
+    canvas.width = EXPORT_TEMPLATE_LARGURA * EXPORT_PNG_ESCALA;
+    canvas.height = EXPORT_TEMPLATE_ALTURA * EXPORT_PNG_ESCALA;
     const ctx = canvas.getContext("2d");
+    ctx.scale(EXPORT_PNG_ESCALA, EXPORT_PNG_ESCALA);
 
     if (imagemTemplate) {
       ctx.drawImage(imagemTemplate, 0, 0, EXPORT_TEMPLATE_LARGURA, EXPORT_TEMPLATE_ALTURA);
@@ -588,8 +595,8 @@ async function exportarGerarPdfCarrinho() {
       const xBadge = x + padCard;
       const yBadge = y + alturaCard - padCard - alturaBadge;
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.2);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.2);
       const linhaCodigo = doc.splitTextToSize(`Cód. ${item.codigo}`, larguraFoto)[0];
 
       doc.setFont("helvetica", "bolditalic");
@@ -613,9 +620,9 @@ async function exportarGerarPdfCarrinho() {
       doc.setFontSize(8.3);
       linhasNome.forEach((linha, li) => doc.text(linha, x + padCard, yPrimeiraLinhaNome + li * linhaAlturaNome));
 
-      doc.setTextColor(130, 130, 130);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.2);
+      doc.setTextColor(30, 30, 30);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.2);
       doc.text(linhaCodigo, x + padCard, yCodigo);
 
       doc.setFillColor(92, 31, 84);
@@ -629,9 +636,9 @@ async function exportarGerarPdfCarrinho() {
       doc.text("unid", xBadge + larguraBadge - 2, yBadge + 3.4, { align: "right" });
 
       doc.setFont("helvetica", "bolditalic");
-      doc.setFontSize(13.5);
+      doc.setFontSize(15);
       doc.setTextColor(255, 255, 255);
-      doc.text(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 2, { align: "center" });
+      doc.text(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 3, { align: "center" });
 
       coluna++;
       if (coluna === colunas) {
