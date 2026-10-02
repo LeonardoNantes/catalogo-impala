@@ -657,7 +657,121 @@ async function exportarGerarPdfCarrinho() {
   }
 }
 
+// ---------- Botão "PDF do pedido" — tela do carrinho (perto da lixeira) ----------
+// Cópia simples (só texto, sem molde/fotos) do mesmo pedido que vai pro
+// WhatsApp — pra quando o cliente não consegue usar o WhatsApp Web no
+// computador, ele ainda consegue baixar/mandar um PDF com os itens.
+function exportarPdfPedidoTexto() {
+  const grupos = exportarItensDoCarrinhoAgrupados();
+
+  if (grupos.length === 0) {
+    alert("Seu carrinho está vazio. Adicione itens antes de gerar o PDF do pedido.");
+    return;
+  }
+
+  const botao = document.getElementById("btn-pdf-pedido");
+  botao.disabled = true;
+
+  try {
+    const nomeLoja = document.getElementById("input-loja").value.trim();
+    const nomeVendedor = (document.getElementById("vendedor-nome").textContent || "").trim();
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const margemX = 18;
+    const larguraPagina = 210;
+    const larguraUtil = larguraPagina - margemX * 2;
+    const areaBase = 280;
+    let y = 20;
+
+    function novaPaginaSeNecessario(alturaNecessaria) {
+      if (y + alturaNecessaria > areaBase) {
+        doc.addPage();
+        y = 20;
+      }
+    }
+
+    doc.setFont("helvetica", "bolditalic");
+    doc.setFontSize(18);
+    doc.setTextColor(92, 31, 84);
+    doc.text(`Pedido — ${CONFIG.nomeCatalogo}`, margemX, y);
+    y += 8;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(90, 90, 90);
+    const dataTexto = new Date().toLocaleDateString("pt-BR");
+    doc.text(`Vendedor: ${nomeVendedor || "-"}   •   Data: ${dataTexto}`, margemX, y);
+    y += 6;
+    doc.text(`Loja: ${nomeLoja || "Não informada"}`, margemX, y);
+    y += 11;
+
+    grupos.forEach((grupo) => {
+      novaPaginaSeNecessario(14);
+
+      doc.setFont("helvetica", "bolditalic");
+      doc.setFontSize(12);
+      doc.setTextColor(173, 20, 87);
+      doc.text(grupo.colecao.toUpperCase(), margemX, y);
+      y += 2.5;
+
+      doc.setDrawColor(230, 220, 228);
+      doc.setLineWidth(0.3);
+      doc.line(margemX, y, margemX + larguraUtil, y);
+      y += 6.5;
+
+      grupo.itens.forEach((item) => {
+        novaPaginaSeNecessario(9);
+
+        const quantidade = carrinho.get(item.codigo)?.quantidade || 0;
+        const subtotal = quantidade * Number(item.preco_unitario);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(40, 40, 40);
+        const descricaoLinha = doc.splitTextToSize(item.descricao, larguraUtil * 0.56)[0];
+        doc.text(descricaoLinha, margemX, y);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(130, 130, 130);
+        doc.text(`Cód. ${item.codigo}  •  Qtd: ${quantidade}`, margemX, y + 4.4);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10.5);
+        doc.setTextColor(92, 31, 84);
+        doc.text(exportarFormatarPrecoSemPrefixo(subtotal).replace(/^/, "R$ "), margemX + larguraUtil, y, { align: "right" });
+
+        y += 9.5;
+      });
+
+      y += 3.5;
+    });
+
+    novaPaginaSeNecessario(16);
+    doc.setDrawColor(92, 31, 84);
+    doc.setLineWidth(0.5);
+    doc.line(margemX, y, margemX + larguraUtil, y);
+    y += 8;
+
+    doc.setFont("helvetica", "bolditalic");
+    doc.setFontSize(13.5);
+    doc.setTextColor(92, 31, 84);
+    doc.text("TOTAL DO PEDIDO", margemX, y);
+    doc.text(exportarFormatarPrecoSemPrefixo(calcularTotalCarrinho()).replace(/^/, "R$ "), margemX + larguraUtil, y, { align: "right" });
+
+    const dataArquivo = new Date().toISOString().slice(0, 10);
+    doc.save(`pedido-impala-${dataArquivo}.pdf`);
+  } catch (erro) {
+    console.error("[Carrinho Impala] Erro ao gerar PDF do pedido:", erro);
+    alert("Não consegui gerar o PDF do pedido. Tenta de novo.");
+  } finally {
+    botao.disabled = false;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btn-exportar-imagem-ofertas").addEventListener("click", exportarGerarImagemCarrinho);
   document.getElementById("btn-exportar-pdf-ofertas").addEventListener("click", exportarGerarPdfCarrinho);
+  document.getElementById("btn-pdf-pedido").addEventListener("click", exportarPdfPedidoTexto);
 });
