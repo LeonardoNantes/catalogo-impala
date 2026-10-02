@@ -18,10 +18,13 @@ const EXPORT_TEMPLATE_LARGURA = 1414;
 const EXPORT_TEMPLATE_ALTURA = 2000;
 // Área em branco da imagem-modelo onde a grade de cartões pode ser
 // desenhada sem cobrir a moldura (medida direto no arquivo do Leonardo).
-const EXPORT_TEMPLATE_AREA = { esq: 60, dir: 1360, topo: 215, base: 1940 };
+// Atualizado pro molde novo, com o cabeçalho mais enxuto (logo termina
+// por volta de y:127, bem antes do y:190 do molde antigo) — é esse
+// espaço a mais que abriu lugar pra 4ª fileira de cartões.
+const EXPORT_TEMPLATE_AREA = { esq: 40, dir: 1368, topo: 140, base: 1960 };
 // Altura reservada no topo pra a foto + nome do vendedor, do lado
 // esquerdo da logo "Catálogo Impala" (mesma altura do texto da logo).
-const EXPORT_VENDEDOR_FOTO_Y_CENTRO = 125;
+const EXPORT_VENDEDOR_FOTO_Y_CENTRO = 80;
 const EXPORT_VENDEDOR_FOTO_DIAMETRO = 100;
 const EXPORT_VENDEDOR_INDENT = 22;
 // A altura de cada cartão da Imagem é calculada a partir do conteúdo
@@ -37,6 +40,11 @@ const EXPORT_GRADE_GAP_CODIGO_BADGE = 14;
 const EXPORT_GRADE_LINHA_ALTURA_NOME = 18;
 const EXPORT_GRADE_MAX_LINHAS_NOME = 2;
 const EXPORT_GRADE_ALTURA_BADGE = 52;
+// A foto do cartão fica um pouco mais baixa que larga (em vez de
+// quadrada) — é o "encolher o cartão" que abre espaço pra 4ª fileira
+// (16 itens por imagem em vez de 12), sem precisar mexer no tamanho dos
+// cartões nem no espaço entre eles.
+const EXPORT_GRADE_FATOR_ALTURA_FOTO = 0.93;
 // Cor da etiqueta de preço nos cartões — tom roxo/vinho do próprio logo
 // do Impala (puxado direto da palavra "Impala" na imagem-modelo), com o
 // mesmo brilho dourado suave que já era usado na foto do vendedor no app.
@@ -311,7 +319,7 @@ function exportarCalcularGradePng() {
   const alturaUtil = areaBase - areaTopo;
   const larguraCard = (larguraUtil - gutterH * (colunas - 1)) / colunas;
   const larguraFoto = larguraCard - padCard * 2;
-  const alturaImagem = larguraFoto; // foto quadrada
+  const alturaImagem = larguraFoto * EXPORT_GRADE_FATOR_ALTURA_FOTO;
 
   // Altura do cartão = só o que o conteúdo realmente precisa (foto + nome
   // de até 2 linhas + código + etiqueta de preço), igual ao PDF — em vez
@@ -336,23 +344,20 @@ function exportarCalcularGradePng() {
 // A Imagem (PNG) é uma folha de tamanho fixo (ao contrário do PDF, que só
 // usa quantas páginas precisar), então quando o carrinho tem menos itens
 // do que cabe na grade, sobra espaço em branco no final. Em vez de deixar
-// essa sobra toda embaixo, espalha ela como respiro extra entre as
-// fileiras (e centraliza o bloco inteiro verticalmente) — só pra Imagem,
-// o PDF continua do jeito que já era.
+// essa sobra toda embaixo (carrinho "encostado" no topo) ou esticar o
+// espaço entre as fileiras (o que deixava um vão enorme e esquisito entre
+// elas), o espaço entre as fileiras fica sempre igual, e só o bloco
+// inteiro é centralizado verticalmente — como um cartaz com poucos itens
+// bem no meio da folha, em vez de grudado em cima ou com buracos no meio.
+// Só pra Imagem — o PDF continua do jeito que já era.
 function exportarAjustarEspacamentoPng(grade, totalItens) {
   const { colunas, gutterV, alturaCard, areaTopo, alturaUtil } = grade;
   const linhasReais = Math.max(1, Math.ceil(totalItens / colunas));
 
-  let gutterVAjustado = gutterV;
-  if (linhasReais > 1) {
-    const gutterVCalculado = (alturaUtil - linhasReais * alturaCard) / (linhasReais - 1);
-    gutterVAjustado = Math.max(gutterV, gutterVCalculado);
-  }
-
-  const alturaBlocoGrade = linhasReais * alturaCard + (linhasReais - 1) * gutterVAjustado;
+  const alturaBlocoGrade = linhasReais * alturaCard + (linhasReais - 1) * gutterV;
   const areaTopoAjustada = areaTopo + Math.max(0, (alturaUtil - alturaBlocoGrade) / 2);
 
-  return { gutterV: gutterVAjustado, areaTopo: areaTopoAjustada };
+  return { gutterV, areaTopo: areaTopoAjustada };
 }
 
 // ---------- Botão "Gerar Imagem" ----------
