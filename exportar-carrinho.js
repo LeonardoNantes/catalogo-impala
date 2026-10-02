@@ -327,10 +327,32 @@ function exportarCalcularGradePng() {
   const linhasGrade = Math.max(1, Math.floor((alturaUtil + gutterV) / (alturaCard + gutterV)));
 
   return {
-    colunas, gutterH, gutterV, padCard, areaEsq, areaTopo,
+    colunas, gutterH, gutterV, padCard, areaEsq, areaTopo, alturaUtil,
     larguraCard, alturaCard, larguraFoto, alturaImagem,
     linhasGrade, limite: colunas * linhasGrade,
   };
+}
+
+// A Imagem (PNG) é uma folha de tamanho fixo (ao contrário do PDF, que só
+// usa quantas páginas precisar), então quando o carrinho tem menos itens
+// do que cabe na grade, sobra espaço em branco no final. Em vez de deixar
+// essa sobra toda embaixo, espalha ela como respiro extra entre as
+// fileiras (e centraliza o bloco inteiro verticalmente) — só pra Imagem,
+// o PDF continua do jeito que já era.
+function exportarAjustarEspacamentoPng(grade, totalItens) {
+  const { colunas, gutterV, alturaCard, areaTopo, alturaUtil } = grade;
+  const linhasReais = Math.max(1, Math.ceil(totalItens / colunas));
+
+  let gutterVAjustado = gutterV;
+  if (linhasReais > 1) {
+    const gutterVCalculado = (alturaUtil - linhasReais * alturaCard) / (linhasReais - 1);
+    gutterVAjustado = Math.max(gutterV, gutterVCalculado);
+  }
+
+  const alturaBlocoGrade = linhasReais * alturaCard + (linhasReais - 1) * gutterVAjustado;
+  const areaTopoAjustada = areaTopo + Math.max(0, (alturaUtil - alturaBlocoGrade) / 2);
+
+  return { gutterV: gutterVAjustado, areaTopo: areaTopoAjustada };
 }
 
 // ---------- Botão "Gerar Imagem" ----------
@@ -344,7 +366,7 @@ async function exportarGerarImagemCarrinho() {
   }
 
   const {
-    colunas, gutterH, gutterV, padCard, areaEsq, areaTopo,
+    colunas, gutterH, gutterV, padCard, areaEsq, areaTopo, alturaUtil,
     larguraCard, alturaCard, larguraFoto, alturaImagem, limite,
   } = exportarCalcularGradePng();
 
@@ -380,9 +402,14 @@ async function exportarGerarImagemCarrinho() {
 
     exportarDesenharCabecalhoVendedorCanvas(ctx, imagemVendedor);
 
+    const { gutterV: gutterVAjustado, areaTopo: areaTopoAjustada } = exportarAjustarEspacamentoPng(
+      { colunas, gutterV, alturaCard, areaTopo, alturaUtil },
+      itensParaImagem.length
+    );
+
     exportarDesenharGradeDeCartoes(ctx, itensParaImagem, imagensProdutos, {
-      colunas, areaEsq, areaTopo, larguraCard, alturaCard, gutterH, gutterV,
-      padCard, larguraFoto, alturaImagem,
+      colunas, areaEsq, areaTopo: areaTopoAjustada, larguraCard, alturaCard,
+      gutterH, gutterV: gutterVAjustado, padCard, larguraFoto, alturaImagem,
     });
 
     const dataArquivo = new Date().toISOString().slice(0, 10);
