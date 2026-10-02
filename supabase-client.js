@@ -47,6 +47,28 @@ async function resolverVendedorId() {
   }
 }
 
+// Grava uma linha na tabela "ofertas_visualizacoes" toda vez que um catálogo
+// é aberto — é o que alimenta a tela "Acessos" do Painel de Vendedores. Roda
+// em segundo plano (não espera resposta, não trava o carregamento do
+// catálogo) e qualquer erro fica só no console, nunca interrompe o app pro
+// cliente.
+function registrarAcesso(vendedorId) {
+  const { url, anonKey } = CONFIG.supabase;
+  if (!url || !anonKey || !vendedorId) return;
+
+  try {
+    const client = window.supabase.createClient(url, anonKey);
+    client
+      .from("ofertas_visualizacoes")
+      .insert({ vendedor_slug: vendedorId })
+      .then(({ error }) => {
+        if (error) console.error("[Impala] Erro ao registrar acesso:", error);
+      });
+  } catch (erro) {
+    console.error("[Impala] Erro ao registrar acesso:", erro);
+  }
+}
+
 // Busca na tabela "vendedores" os dados desse vendedor: se está ativo
 // (assinatura em dia), qual é a ÁREA de preço dele (SC, PR, etc.), e os
 // dados que aparecem no cabeçalho (nome, foto, whatsapp).

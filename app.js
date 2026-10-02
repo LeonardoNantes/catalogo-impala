@@ -324,6 +324,7 @@ async function iniciar() {
     mostrarTela("tela-nao-encontrado");
     return;
   }
+  registrarAcesso(vendedorId);
 
   // 2) Busca os dados desse vendedor no Supabase
   const statusVendedor = await buscarStatusVendedor(vendedorId);
