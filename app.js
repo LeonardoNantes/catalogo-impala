@@ -25,10 +25,13 @@ function mostrarTela(idTela, direcao = "frente") {
       tela.classList.add(direcao === "voltar" ? "tela-anim-voltar" : "tela-anim-frente");
     }
   });
-  // O botão flutuante do carrinho só aparece nas telas 1 e 2
+  // O carrinho flutuante aparece nas telas 1 e 2; os botões de PDF/Imagem
+  // das ofertas aparecem só na tela inicial
   const btnCarrinho = document.getElementById("btn-carrinho");
+  const acoesExportar = document.querySelector(".acoes-exportar");
   const telasSemCarrinho = ["tela-carrinho", "tela-pausado", "tela-nao-encontrado"];
   btnCarrinho.hidden = telasSemCarrinho.includes(idTela);
+  acoesExportar.hidden = idTela !== "tela-inicial";
   window.scrollTo(0, 0);
 }
 
