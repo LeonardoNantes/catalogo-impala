@@ -669,3 +669,72 @@ body {
 @media (min-width: 640px) {
   .grade-colecoes { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ============================================================
+   CAIXINHA "você já enviou esses itens?" (pergunta pós-envio do
+   carrinho guardado no celular)
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal-overlay[hidden] { display: none; }
+
+.modal-caixa {
+  width: 100%;
+  max-width: 360px;
+  background: var(--cor-branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-forte);
+  padding: 22px 20px;
+  text-align: center;
+}
+
+.modal-titulo {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+.modal-subtexto {
+  margin: 0 0 18px;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.modal-botoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+
+.modal-btn-primario {
+  background: var(--cor-primaria);
+  color: var(--cor-branco);
+}
+
+.modal-btn-secundario {
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
+}
+
+.modal-btn:active { transform: scale(0.97); }

@@ -184,6 +184,23 @@
     </button>
   </div>
 
+  <!-- ===================================================== -->
+  <!-- CAIXINHA: "você já enviou esses itens pelo WhatsApp?" -->
+  <!-- Aparece quando o cliente volta pro catálogo depois de ter tocado em
+       "Enviar pedido" (pelo menos uns segundos antes) e ainda tem itens no
+       carrinho - ver verificarPerguntaReenvio() em app.js. -->
+  <!-- ===================================================== -->
+  <div id="modal-reenvio" class="modal-overlay" hidden>
+    <div class="modal-caixa">
+      <p class="modal-titulo">Você já enviou esses itens pelo WhatsApp?</p>
+      <p class="modal-subtexto">Quer limpar a seleção pra começar de novo?</p>
+      <div class="modal-botoes">
+        <button id="btn-reenvio-limpar" class="modal-btn modal-btn-primario">Sim, limpar</button>
+        <button id="btn-reenvio-manter" class="modal-btn modal-btn-secundario">Não, manter</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase JS via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <!-- jsPDF via CDN, usado só pra gerar o PDF do carrinho -->

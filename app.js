@@ -8,6 +8,7 @@ let TODOS_PRODUTOS = [];
 let PRODUTOS_POR_COLECAO = new Map(); // colecao -> [produtos]
 let COLECAO_ATUAL = null; // colecao sendo exibida na tela 2
 let VENDEDOR_ATUAL = null; // { nome, whatsapp, foto_url, area, ... } do vendedor resolvido nesse acesso
+let SLUG_VENDEDOR_ATUAL = null; // slug usado pra separar o carrinho guardado no celular por vendedor
 
 // ---------- Formatação ----------
 function formatarPreco(valor) {
@@ -158,8 +159,12 @@ function alterarQuantidade(produto, delta, qtdValorEl) {
     carrinho.set(produto.codigo, { produto, quantidade: nova });
   }
 
-  qtdValorEl.textContent = nova;
+  if (qtdValorEl) qtdValorEl.textContent = nova;
   atualizarContadorCarrinho();
+  salvarCarrinhoNoCelular();
+  // Ele continuou mexendo no carrinho depois de um envio anterior — esquece
+  // aquele envio, pra pergunta "você já enviou?" não aparecer mais por ele.
+  limparFlagEnviado();
 }
 
 function atualizarContadorCarrinho() {
@@ -228,9 +233,109 @@ function limparCarrinho() {
   if (carrinho.size === 0) return;
   const confirmar = confirm("Excluir todos os itens do carrinho?");
   if (!confirmar) return;
+  executarLimpezaCarrinho();
+}
+
+// ---------- Carrinho guardado no celular (localStorage) ----------
+// Guardamos só código do produto + quantidade, separado por vendedor (pela
+// "slug" do link), pra sobreviver a um F5/atualização de página ou o
+// cliente saindo pra atender uma ligação e voltando depois. O preço nunca
+// é guardado — ele sempre vem de novo da lista de produtos carregada na
+// hora, então nunca fica desatualizado. Se o navegador estiver em modo
+// privado ou sem espaço, qualquer leitura/escrita aqui falha em silêncio e
+// o catálogo continua funcionando normal, só sem guardar nada.
+function chaveStorageCarrinho() {
+  return `impala_carrinho_v1_${SLUG_VENDEDOR_ATUAL || "sem-vendedor"}`;
+}
+
+function chaveStorageEnviado() {
+  return `impala_carrinho_enviado_v1_${SLUG_VENDEDOR_ATUAL || "sem-vendedor"}`;
+}
+
+function salvarCarrinhoNoCelular() {
+  try {
+    const itens = [...carrinho.values()].map(({ produto, quantidade }) => ({
+      codigo: produto.codigo,
+      quantidade,
+    }));
+    localStorage.setItem(chaveStorageCarrinho(), JSON.stringify(itens));
+  } catch (erro) {
+    // Modo privado, sem espaço, etc. — ignora e segue só na memória.
+  }
+}
+
+// Lê o carrinho salvo e recoloca os itens, buscando cada produto de novo em
+// TODOS_PRODUTOS (já carregado com o preço/estoque de hoje). Um código
+// salvo que não existe mais na lista atual (produto saiu do catálogo) é
+// simplesmente ignorado — some do carrinho sozinho.
+function restaurarCarrinhoDoCelular() {
+  try {
+    const salvo = localStorage.getItem(chaveStorageCarrinho());
+    if (!salvo) return;
+    const itens = JSON.parse(salvo);
+    if (!Array.isArray(itens)) return;
+
+    const mapaProdutos = new Map(TODOS_PRODUTOS.map((p) => [p.codigo, p]));
+    itens.forEach(({ codigo, quantidade }) => {
+      const produto = mapaProdutos.get(codigo);
+      if (produto && quantidade > 0) {
+        carrinho.set(codigo, { produto, quantidade });
+      }
+    });
+  } catch (erro) {
+    // Ignora e segue com o carrinho vazio, igual a um cliente novo.
+  }
+}
+
+function marcarPedidoEnviado() {
+  try {
+    localStorage.setItem(chaveStorageEnviado(), String(Date.now()));
+  } catch (erro) {
+    // Sem espaço/modo privado — a pergunta pós-envio simplesmente não vai
+    // aparecer depois; não afeta o envio em si.
+  }
+}
+
+function limparFlagEnviado() {
+  try {
+    localStorage.removeItem(chaveStorageEnviado());
+  } catch (erro) {
+    // nada a fazer
+  }
+}
+
+// Usada tanto pela lixeira (depois do confirm() nativo que já existia)
+// quanto pelo "Sim, limpar" da caixinha pós-envio — limpa carrinho, tela e
+// o que está guardado no celular, tudo junto.
+function executarLimpezaCarrinho() {
   carrinho.clear();
   atualizarContadorCarrinho();
   renderizarPainelCarrinho();
+  salvarCarrinhoNoCelular();
+  limparFlagEnviado();
+}
+
+// Checa se faz sentido perguntar "você já enviou esses itens?" — só
+// pergunta se: tem um envio registrado, já passaram pelo menos 4s dele (pra
+// não disparar à toa se a tela "piscar" logo depois do clique de enviar) e
+// ainda tem itens no carrinho pra perguntar sobre.
+function verificarPerguntaReenvio() {
+  try {
+    const enviadoEm = localStorage.getItem(chaveStorageEnviado());
+    if (!enviadoEm) return;
+
+    const passados = Date.now() - Number(enviadoEm);
+    if (Number.isNaN(passados) || passados < 4000) return;
+
+    if (carrinho.size === 0) {
+      limparFlagEnviado();
+      return;
+    }
+
+    document.getElementById("modal-reenvio").hidden = false;
+  } catch (erro) {
+    // Sem localStorage disponível — não tem o que perguntar.
+  }
 }
 
 function abrirCarrinho() {
@@ -293,6 +398,7 @@ function enviarPedidoWhatsapp() {
   const texto = encodeURIComponent(montarTextoPedido());
   const url = `https://wa.me/${whatsappVendedor}?text=${texto}`;
   window.open(url, "_blank");
+  marcarPedidoEnviado();
 }
 
 // ---------- Tela de pausado (assinatura em atraso) ----------
@@ -321,6 +427,7 @@ async function iniciar() {
 
   // 1) Descobre QUEM é o vendedor (via ?v= ou domínio antigo)
   const vendedorId = await resolverVendedorId();
+  SLUG_VENDEDOR_ATUAL = vendedorId;
   if (!vendedorId) {
     carregando.hidden = true;
     configurarBotaoNaoEncontrado();
@@ -355,6 +462,10 @@ async function iniciar() {
   TODOS_PRODUTOS = await buscarProdutos(statusVendedor.area);
   PRODUTOS_POR_COLECAO = agruparPorColecao(TODOS_PRODUTOS);
 
+  // Recupera o carrinho guardado no celular desse vendedor, se tiver.
+  restaurarCarrinhoDoCelular();
+  atualizarContadorCarrinho();
+
   statusMsg.hidden = true;
   renderizarCardsColecao();
 
@@ -364,8 +475,26 @@ async function iniciar() {
   document.getElementById("btn-enviar-pedido").addEventListener("click", enviarPedidoWhatsapp);
   document.getElementById("btn-limpar-carrinho").addEventListener("click", limparCarrinho);
 
+  // Caixinha "você já enviou esses itens?" — some depois de respondida.
+  document.getElementById("btn-reenvio-limpar").addEventListener("click", () => {
+    executarLimpezaCarrinho();
+    document.getElementById("modal-reenvio").hidden = true;
+  });
+  document.getElementById("btn-reenvio-manter").addEventListener("click", () => {
+    limparFlagEnviado();
+    document.getElementById("modal-reenvio").hidden = true;
+  });
+  // Cobre tanto quando o navegador recarrega a página (ex: Android, depois
+  // de voltar do WhatsApp) quanto quando ele só troca de aba/app e volta
+  // sem recarregar nada (ex: iPhone) — nos dois casos checa se é hora de
+  // perguntar.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") verificarPerguntaReenvio();
+  });
+
   carregando.hidden = true;
   mostrarTela("tela-inicial");
+  verificarPerguntaReenvio();
 }
 
 document.addEventListener("DOMContentLoaded", iniciar);
