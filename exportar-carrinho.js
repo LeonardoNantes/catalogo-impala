@@ -59,6 +59,10 @@ const EXPORT_PDF_FATOR_ALTURA_FOTO = 0.906;
 // do Impala (puxado direto da palavra "Impala" na imagem-modelo), com o
 // mesmo brilho dourado suave que já era usado na foto do vendedor no app.
 const EXPORT_COR_BADGE = "#5c1f54";
+// Tom mais claro/discreto da mesma cor, usado só no texto "unid" do selo
+// vazado — mantém a hierarquia visual (preço em destaque, "unid" discreto)
+// que já existia quando o selo era preenchido.
+const EXPORT_COR_BADGE_UNID = "#AA6AA2";
 const EXPORT_COR_NOME_VENDEDOR = "#5c1f54";
 
 // ---------- Helpers de desenho (mesmos do Ofertas da Semana) ----------
@@ -253,25 +257,27 @@ function exportarDesenharGradeDeCartoes(ctx, itens, imagensProdutos, opcoes) {
     ctx.font = "600 17.1px 'Inter', sans-serif";
     ctx.fillText(linhaCodigo, x + padCard, yCodigo);
 
-    ctx.save();
-    ctx.shadowColor = "rgba(212,175,55,0.45)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.fillStyle = EXPORT_COR_BADGE;
+    // Selo vazado (contorno roxo, fundo branco) — mesmo efeito de etiqueta
+    // de preço, só que sem a área roxa sólida, pra gastar bem menos tinta
+    // na hora de imprimir (pedido explícito dos vendedores, mesma mudança
+    // já aprovada no Ofertas da Semana). O brilho dourado existia pra
+    // destacar o preenchimento sólido e não faz falta no modelo vazado.
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = EXPORT_COR_BADGE;
+    ctx.fillStyle = "#FFFFFF";
     exportarDesenharRetanguloArredondado(ctx, xBadge, yBadge, larguraBadge, alturaBadge, 10);
     ctx.fill();
-    ctx.restore();
+    ctx.stroke();
 
-    ctx.fillStyle = "#FFFFFF";
+    ctx.fillStyle = EXPORT_COR_BADGE;
     ctx.font = "700 15.68px 'Inter', sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("R$", xBadge + 11, yBadge + 16);
     ctx.textAlign = "right";
-    ctx.fillStyle = "#E9D9E5";
+    ctx.fillStyle = EXPORT_COR_BADGE_UNID;
     ctx.fillText("unid", xBadge + larguraBadge - 11, yBadge + 16);
 
-    ctx.fillStyle = "#FFFFFF";
+    ctx.fillStyle = EXPORT_COR_BADGE;
     ctx.font = "italic 700 35.63px 'Playfair Display', serif";
     ctx.textAlign = "center";
     ctx.fillText(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 14);
@@ -630,19 +636,23 @@ async function exportarGerarPdfCarrinho() {
       doc.setFontSize(7.2);
       doc.text(linhaCodigo, x + padCard, yCodigo);
 
-      doc.setFillColor(92, 31, 84);
-      doc.roundedRect(xBadge, yBadge, larguraBadge, alturaBadge, 1.6, 1.6, "F");
+      // Selo vazado (contorno roxo, fundo branco) — mesma mudança da Imagem
+      // acima, já aprovada no Ofertas da Semana (menos tinta na impressão).
+      doc.setDrawColor(92, 31, 84);
+      doc.setFillColor(255, 255, 255);
+      doc.setLineWidth(0.35);
+      doc.roundedRect(xBadge, yBadge, larguraBadge, alturaBadge, 1.6, 1.6, "FD");
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.6);
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(92, 31, 84);
       doc.text("R$", xBadge + 2, yBadge + 3.4);
-      doc.setTextColor(233, 217, 229);
+      doc.setTextColor(170, 106, 162);
       doc.text("unid", xBadge + larguraBadge - 2, yBadge + 3.4, { align: "right" });
 
       doc.setFont("helvetica", "bolditalic");
       doc.setFontSize(15);
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(92, 31, 84);
       doc.text(precoTexto, x + larguraCard / 2, yBadge + alturaBadge - 3, { align: "center" });
 
       coluna++;
