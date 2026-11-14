@@ -187,9 +187,17 @@
         <span>Total</span>
         <strong id="carrinho-total-valor">R$ 0,00</strong>
       </div>
-      <button id="btn-enviar-pedido" class="btn-enviar-pedido">
-        Enviar pedido pelo WhatsApp
-      </button>
+      <!-- Foto do vendedor (com "?") ao lado do Enviar: tocar nela abre o
+           mini tour do carrinho -->
+      <div class="carrinho-enviar-linha">
+        <div id="carrinho-foto-wrap" class="vendedor-foto-wrap carrinho-foto-wrap" role="button" tabindex="0" aria-label="Ver como funciona o carrinho">
+          <img id="carrinho-foto" class="vendedor-foto carrinho-foto" src="" alt="Foto do vendedor" />
+          <span class="foto-ajuda" aria-hidden="true">?</span>
+        </div>
+        <button id="btn-enviar-pedido" class="btn-enviar-pedido">
+          Enviar pedido pelo WhatsApp
+        </button>
+      </div>
     </div>
   </section>
 

@@ -1144,3 +1144,29 @@ body {
   background: linear-gradient(135deg, var(--cor-destaque), #ad1457);
   color: var(--cor-branco);
 }
+
+/* ---------- Carrinho: foto do vendedor (com "?") ao lado do Enviar ---------- */
+/* Tocar nela abre o mini tour do carrinho. O botão verde só ficou um pouco
+   mais estreito pra dar lugar à foto. */
+.carrinho-enviar-linha {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.carrinho-enviar-linha .btn-enviar-pedido {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.carrinho-foto-wrap,
+.carrinho-foto {
+  width: 50px;
+  height: 50px;
+}
+
+.carrinho-foto {
+  border-width: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}

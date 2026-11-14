@@ -716,7 +716,7 @@ function montarPassosTour() {
     },
     {
       alvo: () => document.getElementById("btn-ir-carrinho"), botaoCarrinho: true,
-      texto: () => `Quando terminar, toque aqui. No carrinho você confere tudo, ajusta as quantidades e toca em <b>Enviar pedido</b> para mandar direto pro meu WhatsApp. Se preferir, também dá para baixar o pedido em PDF.`,
+      texto: () => `Quando terminar, toque aqui para ver seu <b>carrinho</b> e me enviar o pedido.`,
     },
   ];
 }
@@ -754,6 +754,34 @@ function esconderDicaFoto() {
 }
 
 // ---------- Tour ----------
+// Mini tour da tela do carrinho (foto do vendedor ao lado do "Enviar").
+// Decisões do Leonardo em 14/11/2026: 5 passos, sem dica de 1ª visita aqui
+// (o "?" na foto basta, porque o cliente já aprendeu na tela principal).
+function montarPassosTourCarrinho() {
+  return [
+    {
+      alvo: () => document.querySelector("#lista-carrinho .carrinho-item .qtd-seletor"),
+      texto: () => `Aqui você ajusta as <b>quantidades</b>. Se tirar tudo no <b>−</b>, o item sai do pedido.`,
+    },
+    {
+      alvo: () => document.getElementById("btn-limpar-carrinho"),
+      texto: () => `Quer recomeçar? Aqui você <b>apaga tudo</b> de uma vez.`,
+    },
+    {
+      alvo: () => document.querySelector("#tela-carrinho .carrinho-loja"),
+      texto: () => `Tem mais de uma loja? Escreva aqui <b>para qual loja</b> é o pedido.`,
+    },
+    {
+      alvo: () => document.getElementById("btn-pdf-pedido"),
+      texto: () => `Aqui você baixa seu pedido em <b>PDF</b>, se preferir.`,
+    },
+    {
+      alvo: () => document.getElementById("btn-enviar-pedido"),
+      texto: () => `Tudo certo? Toque aqui e seu pedido chega direto no meu <b>WhatsApp</b>.`,
+    },
+  ];
+}
+
 function iniciarTour() {
   esconderDicaFoto();
   if (TOUR_ATIVO) return;
@@ -761,9 +789,19 @@ function iniciarTour() {
   if (BUSCA || document.getElementById("barra-busca").classList.contains("aberta")) fecharBusca();
   document.getElementById("menu-ordenar").hidden = true;
   window.scrollTo(0, 0);
+  abrirTour(montarPassosTour());
+}
 
-  // Pula passos cujo item não existe na tela (ex: coleção sem produto)
-  TOUR_PASSOS = montarPassosTour().filter((p) => p.alvo());
+function iniciarTourCarrinho() {
+  if (TOUR_ATIVO) return;
+  window.scrollTo(0, 0);
+  abrirTour(montarPassosTourCarrinho());
+}
+
+function abrirTour(passos) {
+  // Pula passos cujo item não existe na tela (ex: coleção sem produto,
+  // carrinho vazio)
+  TOUR_PASSOS = passos.filter((p) => p.alvo());
   if (TOUR_PASSOS.length === 0) return;
 
   TOUR_ATIVO = true;
@@ -864,11 +902,16 @@ function posicionarPassoTour() {
 
 // Liga tudo — chamado no fim do iniciar(), quando o catálogo já está na tela
 function iniciarTourGuiado() {
-  const foto = document.getElementById("vendedor-foto-wrap");
-  foto.addEventListener("click", iniciarTour);
-  foto.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); iniciarTour(); }
-  });
+  const ligarFoto = (el, acao) => {
+    el.addEventListener("click", acao);
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); acao(); }
+    });
+  };
+  ligarFoto(document.getElementById("vendedor-foto-wrap"), iniciarTour);
+  ligarFoto(document.getElementById("carrinho-foto-wrap"), iniciarTourCarrinho);
+  // A foto do carrinho é a mesma do cabeçalho (já carregada a esta altura)
+  document.getElementById("carrinho-foto").src = document.getElementById("vendedor-foto").src;
   document.getElementById("tour-pular").addEventListener("click", encerrarTour);
   document.getElementById("tour-proximo").addEventListener("click", () => {
     if (TOUR_PASSO >= TOUR_PASSOS.length - 1) { encerrarTour(); return; }
