@@ -1,14 +1,29 @@
 // ============================================================
-// LÓGICA DO CATÁLOGO — versão do site COMPARTILHADO (3 telas, coleções,
-// carrinho e WhatsApp) — reconhece o vendedor por ?v= ou domínio antigo
+// LÓGICA DO CATÁLOGO — versão do site COMPARTILHADO (tela do catálogo com
+// abas de coleção + tela do carrinho e WhatsApp) — reconhece o vendedor por
+// ?v= ou domínio antigo
 // ============================================================
 
-const carrinho = new Map(); // codigo -> { produto, quantidade }
+// codigo -> { produto, quantidade }
+// "quantidade" aqui é número de UNIDADES (não caixas) — cada clique no +/-
+// soma ou tira a "fração" daquele produto (produto.fracao), igual sempre
+// funcionou no Impala. O preço usado nas contas é sempre o preco_unitario.
+const carrinho = new Map();
 let TODOS_PRODUTOS = [];
-let PRODUTOS_POR_COLECAO = new Map(); // colecao -> [produtos]
-let COLECAO_ATUAL = null; // colecao sendo exibida na tela 2
+let PRODUTOS_POR_COLECAO = new Map(); // colecao -> [produtos] (na ordem da planilha)
 let VENDEDOR_ATUAL = null; // { nome, whatsapp, foto_url, area, ... } do vendedor resolvido nesse acesso
 let SLUG_VENDEDOR_ATUAL = null; // slug usado pra separar o carrinho guardado no celular por vendedor
+
+// ---------- Estado da tela do catálogo (abas) ----------
+// Antes eram 2 telas (cards de coleção → grade da coleção); agora é uma tela
+// só, com uma aba por coleção no topo — igual ao Nadir. As abas ficam na
+// MESMA ORDEM que os cards de coleção já ficavam (ordem da planilha),
+// decisão do Leonardo — diferente do Nadir, que usa ordem alfabética.
+let COLECOES = []; // nomes das coleções, na ordem da planilha
+let ABA_ATIVA = null; // coleção da aba aberta
+let BUSCA = ""; // texto da busca já normalizado ("" = sem busca)
+let ORDENACAO = "padrao"; // "padrao" (ordem da planilha) | "menor" | "maior" preço
+let POSICAO_ROLAGEM = 0; // onde a lista estava ao abrir o carrinho, pra voltar no mesmo ponto
 
 // ---------- Formatação ----------
 function formatarPreco(valor) {
@@ -26,13 +41,10 @@ function mostrarTela(idTela, direcao = "frente") {
       tela.classList.add(direcao === "voltar" ? "tela-anim-voltar" : "tela-anim-frente");
     }
   });
-  // O carrinho flutuante aparece nas telas 1 e 2; os botões de PDF/Imagem
-  // das ofertas aparecem só na tela inicial
-  const btnCarrinho = document.getElementById("btn-carrinho");
-  const acoesExportar = document.querySelector(".acoes-exportar");
-  const telasSemCarrinho = ["tela-carrinho", "tela-pausado", "tela-nao-encontrado"];
-  btnCarrinho.hidden = telasSemCarrinho.includes(idTela);
-  acoesExportar.hidden = idTela !== "tela-inicial";
+  // A barra fixa "Ir para o carrinho" só aparece na tela do catálogo (os
+  // botões Buscar/PDF/Imagem já ficam dentro do cabeçalho dela).
+  document.getElementById("barra-ir-carrinho").hidden = idTela !== "tela-inicial";
+  document.getElementById("menu-ordenar").hidden = true;
   window.scrollTo(0, 0);
 }
 
@@ -41,15 +53,12 @@ function iniciarCabecalhoMarca() {
   document.getElementById("nome-catalogo").textContent = CONFIG.nomeCatalogo;
   document.getElementById("vendedor-slogan").textContent = CONFIG.vendedorPadrao.slogan;
   document.getElementById("vendedor-foto").src = CONFIG.vendedorPadrao.foto;
-  document.getElementById("slogan-marca").textContent = CONFIG.sloganMarca;
   document.documentElement.style.setProperty("--cor-primaria", CONFIG.corPrimaria);
   document.documentElement.style.setProperty("--cor-destaque", CONFIG.corDestaque);
   document.documentElement.style.setProperty("--cor-dourada", CONFIG.corDourada);
   document.title = CONFIG.nomeCatalogo;
-
-  const btnSolicitar = document.getElementById("btn-solicitar-catalogo");
-  const texto = encodeURIComponent(PLATAFORMA.mensagemPadrao);
-  btnSolicitar.href = `https://wa.me/${PLATAFORMA.whatsapp}?text=${texto}`;
+  // (O slogan da marca e o "Solicitar Catálogo" saíram da tela — mesma
+  // decisão tomada no Nadir.)
 }
 
 // ---------- Cabeçalho: parte que depende do vendedor identificado ----------
@@ -60,7 +69,7 @@ function preencherCabecalhoVendedor(vendedor) {
   }
 }
 
-// ---------- Tela 1: cards de coleção ----------
+// ---------- Tela do catálogo: abas de coleção ----------
 function agruparPorColecao(produtos) {
   const mapa = new Map();
   produtos.forEach((p) => {
@@ -70,33 +79,174 @@ function agruparPorColecao(produtos) {
   return mapa;
 }
 
-function renderizarCardsColecao() {
-  const grade = document.getElementById("grade-colecoes");
-  grade.innerHTML = "";
-  const paleta = CONFIG.paletaCards;
-  let i = 0;
+// Uma aba por coleção, na mesma ordem em que os produtos chegam da planilha
+// (só coleções que têm produto ativo aparecem, porque a lista vem dos
+// próprios produtos carregados). Os produtos DENTRO de cada aba continuam
+// na ordem da planilha (coluna "ordem") — essa é a ordem "Padrão" do botão
+// de ordenar.
+function renderizarAbas() {
+  const nav = document.getElementById("categoria-tabs");
+  nav.innerHTML = "";
+  COLECOES.forEach((colecao) => {
+    const aba = document.createElement("button");
+    aba.type = "button";
+    aba.className = "categoria-tab" + (colecao === ABA_ATIVA ? " ativa" : "");
+    aba.textContent = colecao;
+    aba.addEventListener("click", () => trocarAba(colecao));
+    nav.appendChild(aba);
+  });
+  centralizarAbaAtiva(nav);
+}
 
-  for (const [colecao, produtos] of PRODUTOS_POR_COLECAO) {
-    const cor = paleta[i % paleta.length];
-    i++;
+// A aba escolhida desliza sempre pro meio da barra, pra dar pra ver as
+// abas de trás e as da frente conforme o cliente vai tocando.
+function centralizarAbaAtiva(nav) {
+  const ativa = nav.querySelector(".categoria-tab.ativa");
+  if (!ativa) return;
+  const alvo = ativa.offsetLeft - (nav.clientWidth - ativa.clientWidth) / 2;
+  nav.scrollTo({ left: Math.max(0, alvo), behavior: "smooth" });
+}
 
-    const card = document.createElement("button");
-    card.className = "colecao-card";
-    card.style.setProperty("--cor-card", cor);
-    card.innerHTML = `<span class="colecao-card-nome">${colecao}</span>`;
-    card.addEventListener("click", () => abrirColecao(colecao));
-    grade.appendChild(card);
+function trocarAba(colecao) {
+  ABA_ATIVA = colecao;
+  if (document.getElementById("barra-busca").classList.contains("aberta")) fecharBusca(false);
+  // A ordenação por preço vale só pra aba em que foi escolhida: trocou de
+  // aba, volta pro padrão.
+  ORDENACAO = "padrao";
+  atualizarMenuOrdenar();
+  renderizarAbas();
+  renderizarLista();
+  window.scrollTo(0, 0);
+}
+
+// ---------- Busca (lupa) — procura em todas as coleções ----------
+// Ignora acento e maiúscula/minúscula; com várias palavras, o produto
+// precisa ter todas (em qualquer ordem) na descrição, código ou cód. de barras.
+function normalizarBusca(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
+function produtoBateComBusca(produto) {
+  const alvo = normalizarBusca(`${produto.descricao} ${produto.codigo} ${produto.codigo_barras || ""}`);
+  return BUSCA.split(/\s+/).every((palavra) => alvo.includes(palavra));
+}
+
+function abrirBusca() {
+  document.getElementById("barra-busca").classList.add("aberta");
+  document.getElementById("btn-busca").classList.add("ativo");
+  document.getElementById("campo-busca").focus();
+}
+
+function fecharBusca(redesenhar = true) {
+  document.getElementById("barra-busca").classList.remove("aberta");
+  document.getElementById("btn-busca").classList.remove("ativo");
+  document.getElementById("campo-busca").value = "";
+  document.getElementById("categoria-tabs").classList.remove("em-busca");
+  BUSCA = "";
+  if (redesenhar) renderizarLista();
+}
+
+// ---------- Ordenar por preço ----------
+function atualizarMenuOrdenar() {
+  document.getElementById("btn-ordenar").classList.toggle("ativo", ORDENACAO !== "padrao");
+  document.querySelectorAll("#menu-ordenar button").forEach((btn) => {
+    btn.classList.toggle("selecionada", btn.dataset.ordenacao === ORDENACAO);
+  });
+}
+
+// ---------- Lista de produtos da aba aberta (ou do resultado da busca) ----------
+function produtosVisiveis() {
+  const lista = BUSCA
+    ? TODOS_PRODUTOS.filter(produtoBateComBusca)
+    : [...(PRODUTOS_POR_COLECAO.get(ABA_ATIVA) || [])];
+  if (ORDENACAO === "menor") lista.sort((a, b) => Number(a.preco_unitario) - Number(b.preco_unitario));
+  else if (ORDENACAO === "maior") lista.sort((a, b) => Number(b.preco_unitario) - Number(a.preco_unitario));
+  return lista;
+}
+
+function renderizarLista() {
+  const produtos = produtosVisiveis();
+  const resumo = document.getElementById("busca-resumo");
+  if (BUSCA) {
+    resumo.hidden = false;
+    resumo.textContent = `${produtos.length} ${produtos.length === 1 ? "produto encontrado" : "produtos encontrados"} em todas as coleções`;
+  } else {
+    resumo.hidden = true;
   }
+
+  if (produtos.length === 0) {
+    const grade = document.getElementById("grade-produtos");
+    grade.innerHTML = `<p class="sem-itens">${BUSCA ? "Nenhum produto encontrado." : "Nenhum produto disponível no momento."}</p>`;
+    return;
+  }
+  renderizarGradeProdutos(produtos);
 }
 
-// ---------- Tela 2: produtos da coleção ----------
-function abrirColecao(colecao) {
-  COLECAO_ATUAL = colecao;
-  document.getElementById("titulo-colecao").textContent = colecao;
-  renderizarGradeProdutos(PRODUTOS_POR_COLECAO.get(colecao) || []);
-  mostrarTela("tela-colecao");
+// ---------- Foto ampliada (toque na foto do produto) ----------
+function abrirFotoAmpliada(url) {
+  document.getElementById("foto-zoom-img").src = url;
+  document.getElementById("foto-zoom-fundo").hidden = false;
 }
 
+function fecharFotoAmpliada() {
+  document.getElementById("foto-zoom-fundo").hidden = true;
+  document.getElementById("foto-zoom-img").removeAttribute("src");
+}
+
+// Liga os botões da tela do catálogo (abas, busca, ordenar, carrinho, zoom).
+function configurarTelaCatalogo() {
+  document.getElementById("btn-busca").addEventListener("click", () => {
+    document.getElementById("barra-busca").classList.contains("aberta") ? fecharBusca() : abrirBusca();
+  });
+  document.getElementById("btn-fechar-busca").addEventListener("click", () => fecharBusca());
+  document.getElementById("campo-busca").addEventListener("input", (e) => {
+    BUSCA = normalizarBusca(e.target.value);
+    document.getElementById("categoria-tabs").classList.toggle("em-busca", !!BUSCA);
+    renderizarLista();
+    window.scrollTo(0, 0);
+  });
+
+  const menuOrdenar = document.getElementById("menu-ordenar");
+  document.getElementById("btn-ordenar").addEventListener("click", (e) => {
+    e.stopPropagation();
+    menuOrdenar.hidden = !menuOrdenar.hidden;
+  });
+  menuOrdenar.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ORDENACAO = btn.dataset.ordenacao;
+      atualizarMenuOrdenar();
+      menuOrdenar.hidden = true;
+      renderizarLista();
+      window.scrollTo(0, 0);
+    });
+  });
+  // Com o menu aberto, tocar fora dele SÓ fecha o menu — o toque não passa
+  // pro que estiver embaixo (senão o cliente poderia, sem querer, somar
+  // uma unidade num "+" ou abrir uma foto só tentando fechar o menu).
+  document.addEventListener("click", (e) => {
+    if (!menuOrdenar.hidden && !menuOrdenar.contains(e.target)) {
+      menuOrdenar.hidden = true;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+  atualizarMenuOrdenar();
+
+  document.getElementById("btn-ir-carrinho").addEventListener("click", abrirCarrinho);
+
+  document.getElementById("foto-zoom-fundo").addEventListener("click", (e) => {
+    if (e.target.id === "foto-zoom-fundo" || e.target.id === "foto-zoom-fechar") fecharFotoAmpliada();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.getElementById("foto-zoom-fundo").hidden) fecharFotoAmpliada();
+  });
+}
+
+// ---------- Tela: produtos da aba aberta ----------
 function criarCardProduto(produto) {
   const card = document.createElement("article");
   card.className = "produto-card";
@@ -106,7 +256,7 @@ function criarCardProduto(produto) {
   if (quantidadeAtual > 0) card.classList.add("produto-card-selecionado");
 
   card.innerHTML = `
-    <div class="produto-imagem-wrap">
+    <div class="produto-imagem-wrap" title="Toque pra ampliar a foto">
       <img class="produto-imagem" src="${produto.imagem_url}" alt="${produto.descricao}" loading="lazy" />
     </div>
     <div class="produto-info">
@@ -136,6 +286,7 @@ function criarCardProduto(produto) {
     alterarQuantidade(produto, -produto.fracao, qtdValorEl);
     sincronizarDestaque();
   });
+  card.querySelector(".produto-imagem-wrap").addEventListener("click", () => abrirFotoAmpliada(produto.imagem_url));
 
   return card;
 }
@@ -160,23 +311,24 @@ function alterarQuantidade(produto, delta, qtdValorEl) {
   }
 
   if (qtdValorEl) qtdValorEl.textContent = nova;
-  atualizarContadorCarrinho();
+  atualizarBarraCarrinho();
   salvarCarrinhoNoCelular();
   // Ele continuou mexendo no carrinho depois de um envio anterior — esquece
   // aquele envio, pra pergunta "você já enviou?" não aparecer mais por ele.
   limparFlagEnviado();
 }
 
-function atualizarContadorCarrinho() {
+// Barra fixa de baixo: "Ir para o carrinho (N itens)", ou desabilitada
+// quando nada foi marcado. N = total de unidades marcadas (mesmo número que
+// o antigo contador do botão flutuante mostrava).
+function atualizarBarraCarrinho() {
   let total = 0;
   carrinho.forEach((item) => (total += item.quantidade));
-  document.getElementById("carrinho-contagem").textContent = total;
-
-  // Pequeno "pulso" no botão flutuante pra dar feedback visual ao adicionar/remover
-  const btnCarrinho = document.getElementById("btn-carrinho");
-  btnCarrinho.classList.remove("pulso");
-  void btnCarrinho.offsetWidth;
-  btnCarrinho.classList.add("pulso");
+  const btn = document.getElementById("btn-ir-carrinho");
+  btn.disabled = total === 0;
+  btn.textContent = total === 0
+    ? "Nenhum item selecionado"
+    : `Ir para o carrinho (${total} ${total === 1 ? "item" : "itens"})`;
 }
 
 function calcularTotalCarrinho() {
@@ -309,7 +461,7 @@ function limparFlagEnviado() {
 // o que está guardado no celular, tudo junto.
 function executarLimpezaCarrinho() {
   carrinho.clear();
-  atualizarContadorCarrinho();
+  atualizarBarraCarrinho();
   renderizarPainelCarrinho();
   salvarCarrinhoNoCelular();
   limparFlagEnviado();
@@ -339,18 +491,17 @@ function verificarPerguntaReenvio() {
 }
 
 function abrirCarrinho() {
+  POSICAO_ROLAGEM = window.scrollY;
   renderizarPainelCarrinho();
   mostrarTela("tela-carrinho");
 }
 
 function voltarDoCarrinho() {
-  // Recarrega a grade da coleção pra refletir mudanças de quantidade feitas no carrinho
-  if (COLECAO_ATUAL) {
-    renderizarGradeProdutos(PRODUTOS_POR_COLECAO.get(COLECAO_ATUAL) || []);
-    mostrarTela("tela-colecao", "voltar");
-  } else {
-    mostrarTela("tela-inicial", "voltar");
-  }
+  // Redesenha a lista pra refletir mudanças de quantidade feitas no
+  // carrinho, e volta pro mesmo ponto da lista onde o cliente estava.
+  renderizarLista();
+  mostrarTela("tela-inicial", "voltar");
+  window.scrollTo(0, POSICAO_ROLAGEM);
 }
 
 // ---------- Envio do pedido pelo WhatsApp ----------
@@ -461,16 +612,19 @@ async function iniciar() {
 
   TODOS_PRODUTOS = await buscarProdutos(statusVendedor.area);
   PRODUTOS_POR_COLECAO = agruparPorColecao(TODOS_PRODUTOS);
+  // Ordem das abas = mesma ordem em que as coleções aparecem nos produtos
+  // carregados (ordem da planilha) — igual já era nos cards de coleção.
+  COLECOES = [...PRODUTOS_POR_COLECAO.keys()];
+  ABA_ATIVA = COLECOES[0] || null;
 
-  // Recupera o carrinho guardado no celular desse vendedor, se tiver.
+  // Recupera o carrinho guardado no celular pra ESSE vendedor (se tiver).
   restaurarCarrinhoDoCelular();
-  atualizarContadorCarrinho();
+  atualizarBarraCarrinho();
 
   statusMsg.hidden = true;
-  renderizarCardsColecao();
+  configurarTelaCatalogo();
+  renderizarLista();
 
-  document.getElementById("btn-carrinho").addEventListener("click", abrirCarrinho);
-  document.getElementById("btn-voltar-colecao").addEventListener("click", () => mostrarTela("tela-inicial", "voltar"));
   document.getElementById("btn-voltar-carrinho").addEventListener("click", voltarDoCarrinho);
   document.getElementById("btn-enviar-pedido").addEventListener("click", enviarPedidoWhatsapp);
   document.getElementById("btn-limpar-carrinho").addEventListener("click", limparCarrinho);
@@ -494,6 +648,12 @@ async function iniciar() {
 
   carregando.hidden = true;
   mostrarTela("tela-inicial");
+  // As abas são desenhadas depois que a tela aparece, pra conseguir medir a
+  // largura delas e centralizar a aba ativa.
+  renderizarAbas();
+
+  // Se o cliente voltou pra página depois de já ter enviado um pedido (ex:
+  // abriu o link de novo direto do WhatsApp), pergunta se já enviou.
   verificarPerguntaReenvio();
 }
 
