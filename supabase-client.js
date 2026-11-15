@@ -53,17 +53,16 @@ async function resolverVendedorId() {
 // catálogo) e qualquer erro fica só no console, nunca interrompe o app pro
 // cliente.
 function registrarAcesso(vendedorId) {
-  const { url, anonKey } = CONFIG.supabase;
-  if (!url || !anonKey || !vendedorId) return;
+  if (!vendedorId) return;
 
+  // O registro agora passa por uma função no servidor (api/registrar-acesso),
+  // que lê o IP real de quem acessou - o navegador não insere mais direto
+  // no Supabase. O IP ajuda, mais pra frente, a tentar diferenciar o
+  // próprio vendedor dos clientes dele nos acessos.
   try {
-    const client = window.supabase.createClient(url, anonKey);
-    client
-      .from("ofertas_visualizacoes")
-      .insert({ vendedor_slug: vendedorId })
-      .then(({ error }) => {
-        if (error) console.error("[Impala] Erro ao registrar acesso:", error);
-      });
+    fetch(`/api/registrar-acesso?v=${encodeURIComponent(vendedorId)}`).catch((erro) => {
+      console.error("[Impala] Erro ao registrar acesso:", erro);
+    });
   } catch (erro) {
     console.error("[Impala] Erro ao registrar acesso:", erro);
   }
